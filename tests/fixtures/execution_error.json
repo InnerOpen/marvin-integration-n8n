@@ -1,0 +1,63 @@
+{
+ "id": "1002",
+ "finished": false,
+ "mode": "webhook",
+ "retryOf": "998",
+ "retrySuccessId": null,
+ "status": "error",
+ "createdAt": "2026-10-04T10:00:00.000Z",
+ "startedAt": "2026-10-04T10:00:00.120Z",
+ "stoppedAt": "2026-10-04T10:00:01.480Z",
+ "deletedAt": null,
+ "workflowId": "2tUt1wbLX592XDdX",
+ "waitTill": null,
+ "data": {
+  "startData": {},
+  "resultData": {
+   "runData": {
+    "Webhook": [
+     {
+      "data": {
+       "main": [
+        [
+         {
+          "json": {
+           "headers": {
+            "authorization": "Bearer RUN-DATA-SENTINEL"
+           },
+           "body": {
+            "email": "reader@example.com"
+           }
+          }
+         }
+        ]
+       ]
+      }
+     }
+    ]
+   },
+   "lastNodeExecuted": "HTTP Request",
+   "error": {
+    "message": "The service was not able to process your request xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "name": "NodeApiError",
+    "stack": "NodeApiError: STACK-SENTINEL\n    at ExecuteContext.execute"
+   }
+  },
+  "executionData": {
+   "contextData": {},
+   "nodeExecutionStack": [],
+   "waitingExecution": {}
+  }
+ },
+ "workflowData": {
+  "id": "2tUt1wbLX592XDdX",
+  "name": "Receive from Marvin",
+  "nodes": [
+   {
+    "parameters": {
+     "value": "WORKFLOW-DATA-SENTINEL"
+    }
+   }
+  ]
+ }
+}

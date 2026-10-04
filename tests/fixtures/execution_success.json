@@ -1,0 +1,14 @@
+{
+ "id": "1001",
+ "finished": true,
+ "mode": "webhook",
+ "retryOf": null,
+ "retrySuccessId": null,
+ "status": "success",
+ "createdAt": "2026-10-04T10:00:00.000Z",
+ "startedAt": "2026-10-04T10:00:00.120Z",
+ "stoppedAt": "2026-10-04T10:00:01.480Z",
+ "deletedAt": null,
+ "workflowId": "2tUt1wbLX592XDdX",
+ "waitTill": null
+}

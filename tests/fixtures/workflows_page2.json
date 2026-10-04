@@ -1,0 +1,45 @@
+{
+ "data": [
+  {
+   "id": "Zz00Yy11Xx22Ww33",
+   "name": "Plain intake",
+   "active": true,
+   "createdAt": "2026-09-13T09:00:00.000Z",
+   "updatedAt": "2026-10-01T12:00:00.000Z",
+   "settings": {
+    "executionOrder": "v1"
+   },
+   "staticData": null,
+   "meta": null,
+   "triggerCount": 1,
+   "versionId": "7c0e1f6a-0000-4000-8000-000000000001",
+   "nodes": [
+    {
+     "parameters": {
+      "path": "intake",
+      "options": {}
+     },
+     "id": "e1",
+     "name": "Webhook",
+     "type": "n8n-nodes-base.webhook",
+     "typeVersion": 1,
+     "position": [
+      0,
+      0
+     ],
+     "webhookId": "e1e1e1e1-0000-4000-8000-0000000000cc"
+    }
+   ],
+   "connections": {},
+   "tags": [
+    {
+     "createdAt": "2026-09-01T10:00:00.000Z",
+     "updatedAt": "2026-09-01T10:00:00.000Z",
+     "id": "t1",
+     "name": "marvin"
+    }
+   ]
+  }
+ ],
+ "nextCursor": null
+}

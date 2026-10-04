@@ -1,0 +1,174 @@
+{
+ "data": [
+  {
+   "id": "2tUt1wbLX592XDdX",
+   "name": "Receive from Marvin",
+   "active": true,
+   "createdAt": "2026-09-13T09:00:00.000Z",
+   "updatedAt": "2026-10-01T12:00:00.000Z",
+   "settings": {
+    "executionOrder": "v1"
+   },
+   "staticData": null,
+   "meta": null,
+   "triggerCount": 1,
+   "versionId": "7c0e1f6a-0000-4000-8000-000000000001",
+   "nodes": [
+    {
+     "parameters": {
+      "httpMethod": "POST",
+      "path": "marvin/new-entry",
+      "authentication": "jwtAuth",
+      "responseMode": "responseNode",
+      "options": {}
+     },
+     "id": "a242584c-4ac1-4ac0-ad56-8346ce56906f",
+     "name": "Webhook",
+     "type": "n8n-nodes-base.webhook",
+     "typeVersion": 2,
+     "position": [
+      0,
+      0
+     ],
+     "webhookId": "2a946e0e-c95b-4444-85e7-3fef71436a95",
+     "credentials": {
+      "jwtAuth": {
+       "id": "Jw1",
+       "name": "Marvin JWT"
+      }
+     }
+    },
+    {
+     "parameters": {
+      "respondWith": "json",
+      "responseBody": "={{ { executionId: $execution.id, workflowId: $workflow.id } }}"
+     },
+     "id": "b1",
+     "name": "Respond to Webhook",
+     "type": "n8n-nodes-base.respondToWebhook",
+     "typeVersion": 1.1,
+     "position": [
+      400,
+      0
+     ]
+    }
+   ],
+   "connections": {
+    "Webhook": {
+     "main": [
+      [
+       {
+        "node": "Respond to Webhook",
+        "type": "main",
+        "index": 0
+       }
+      ]
+     ]
+    }
+   },
+   "pinData": {
+    "Webhook": [
+     {
+      "json": {
+       "PINNED": "PINNED-DATA-SENTINEL"
+      }
+     }
+    ]
+   },
+   "tags": [
+    {
+     "createdAt": "2026-09-01T10:00:00.000Z",
+     "updatedAt": "2026-09-01T10:00:00.000Z",
+     "id": "t1",
+     "name": "marvin"
+    },
+    {
+     "createdAt": "2026-09-01T10:00:00.000Z",
+     "updatedAt": "2026-09-01T10:00:00.000Z",
+     "id": "t2",
+     "name": "prod"
+    }
+   ]
+  },
+  {
+   "id": "9fQk3Lm2Np8RsT0v",
+   "name": "Ops hooks",
+   "active": true,
+   "createdAt": "2026-09-13T09:00:00.000Z",
+   "updatedAt": "2026-10-01T12:00:00.000Z",
+   "settings": {
+    "executionOrder": "v1"
+   },
+   "staticData": null,
+   "meta": null,
+   "triggerCount": 1,
+   "versionId": "7c0e1f6a-0000-4000-8000-000000000001",
+   "nodes": [
+    {
+     "parameters": {
+      "multipleMethods": true,
+      "httpMethod": [
+       "GET",
+       "POST"
+      ],
+      "path": "/ops/ping/",
+      "authentication": "headerAuth",
+      "responseMode": "lastNode",
+      "options": {}
+     },
+     "id": "c1",
+     "name": "Hook (any)",
+     "type": "n8n-nodes-base.webhook",
+     "typeVersion": 2,
+     "position": [
+      0,
+      0
+     ],
+     "webhookId": "d4f2c1aa-0000-4000-8000-0000000000aa"
+    },
+    {
+     "parameters": {
+      "httpMethod": "POST",
+      "path": "ops/old",
+      "options": {}
+     },
+     "id": "c2",
+     "name": "Old hook",
+     "type": "n8n-nodes-base.webhook",
+     "typeVersion": 2,
+     "position": [
+      0,
+      0
+     ],
+     "webhookId": "d4f2c1aa-0000-4000-8000-0000000000bb",
+     "disabled": true
+    },
+    {
+     "parameters": {
+      "url": "https://example.com",
+      "sendHeaders": true,
+      "headerParameters": {
+       "parameters": [
+        {
+         "name": "Authorization",
+         "value": "Bearer NODE-SECRET-SENTINEL"
+        }
+       ]
+      }
+     },
+     "id": "c3",
+     "name": "HTTP Request",
+     "type": "n8n-nodes-base.httpRequest",
+     "typeVersion": 4.2,
+     "position": [
+      400,
+      0
+     ]
+    }
+   ],
+   "connections": {},
+   "tags": []
+  }
+ ],
+ "nextCursor": "MTIzZTQ1NjctZTg5Yi0xMmQzLWE0NTYtNDI2NjE0MTc0MDA"
+}

@@ -1,0 +1,31 @@
+[project]
+name = "marvin-integration-n8n"
+version = "0.1.0"
+description = "n8n integration for Marvin — a workflow step triggers an n8n workflow with signed, expiring auth, picks it from n8n's own list, and reads executions back; n8n reports results to a Marvin incoming webhook."
+readme = "README.md"
+requires-python = ">=3.11"
+# 0.5: IntegrationError and declared error policies (`error_policy`, Handle, Retry), ctx.idempotency_key.
+dependencies = ["marvin-integration-sdk>=0.5,<1"]
+
+[project.optional-dependencies]
+# PyJWT only verifies the hand-rolled HS256 tokens in tests; the package itself has no runtime dependencies.
+dev = ["pytest>=8", "ruff>=0.11", "pyjwt>=2.8"]
+
+# The seam that makes the plugin discoverable: an installed Marvin scans this group at startup.
+[project.entry-points."marvin.integrations"]
+n8n = "marvin_integration_n8n:N8nProvider"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/marvin_integration_n8n"]
+
+# Dev only: resolve the SDK from the sibling checkout. Released builds take it from the index.
+[tool.uv.sources]
+marvin-integration-sdk = { path = "../MarvinIntegrationSDK", editable = true }
+
+[tool.ruff]
+line-length = 150
+target-version = "py311"
