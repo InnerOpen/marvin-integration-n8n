@@ -12,7 +12,7 @@ whether Marvin retries, sends the entry to review or tells an admin.
 
 | | |
 |---|---|
-| **n8n URL** (`base_url`, required) | Where Marvin reaches n8n, for webhooks and the API, e.g. `https://n8n.iwobble.com`. It must be a public host: Marvin's integration HTTP client refuses private, loopback and in-cluster addresses (`http://n8n.n8n.svc.cluster.local:5678` is refused). |
+| **n8n URL** (`base_url`, required) | Where Marvin reaches n8n, for webhooks and the API, e.g. `https://n8n.example.com`. It must be a public host: Marvin's integration HTTP client refuses private, loopback and in-cluster addresses (`http://n8n.n8n.svc.cluster.local:5678` is refused). |
 | **n8n API key** (credential, optional) | n8n → Settings → n8n API → Create an API key. Give it only the **`workflow:read`** and **`execution:read`** scopes where your n8n offers scopes. Store it as a workspace secret (e.g. `N8N_API_KEY`) and enter `{{N8N_API_KEY}}`. **Without a key the connection is webhook-only**: `trigger_workflow` works; `list_workflows`, `list_webhooks` and `get_execution` don't, and the step editor's workflow picker falls back to free text. |
 | **Editor URL** (`editor_url`) | Optional: the address people open n8n at, used for execution links. Blank means the n8n URL. |
 | **Webhook prefix** (`webhook_prefix`) | n8n's production webhook path (`N8N_ENDPOINT_WEBHOOK`). Default `webhook`. |
@@ -94,8 +94,8 @@ applies once the retries run out.
 | `response_too_large` | n8n's reply was bigger than Marvin keeps (`INTEGRATION_HTTP_MAX_BYTES`). The request landed. | Treat as success. |
 | anything else (`*`) | e.g. `unknown`. | Notify admins and send to review. |
 
-`workflow_error` defaults to review only. Per-connection Review/Alert overrides per code are a core feature (planned with
-integration-owned error handling), not part of this package.
+`workflow_error` defaults to review only. An admin can change Review and Alert per code for one connection in the card's
+**How errors are handled** table (a core feature, Marvin rc.197); retries, backoff and `then` stay as declared here.
 
 The read actions override every code, because they run from the card or the step editor, where the error shows
 straight away:
@@ -204,9 +204,9 @@ not the mark alone, while Marvin shows integration marks at about 32 px (Jared 2
 - A Webhook path with route parameters (`:id`) is shown and called literally.
 - `n8n-in-flight` matches `n8n_status` `sent` or `waiting`, but nothing here writes `sent`: `trigger_workflow` can't write
   metadata. To track sends, follow the step with your own `set_metadata` `n8n_status: sent`.
-- Marvin reaches n8n only at a public address (`https://n8n.iwobble.com`, through Cloudflare). A per-provider private-host
+- Marvin reaches n8n only at a public address (for example `https://n8n.example.com`). A per-provider private-host
   allowlist is a later core change.
-- The workflow picker and the per-code Review/Alert overrides need a Marvin with those core features. Without them the path is
+- The workflow picker and the per-code Review/Alert overrides need Marvin rc.197 or later. Without them the path is
   free text and the policy above applies as declared.
 - Not done yet: an end-to-end test against a real n8n 2.x (JWT accepted and an expired one rejected, header mode, 404 for an
   inactive workflow, the 500 body shape, the executionId round trip). The tests here use recorded n8n JSON.
