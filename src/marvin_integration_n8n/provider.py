@@ -45,6 +45,7 @@ from marvin_integration_sdk import (
 
 from .auth import AUTH_HEADER, AUTH_JWT, AUTH_MODES, AUTH_NONE, auth_headers
 from .content import CONTENT, WEBHOOK_SECRET_REF
+from .recipes import RECIPES
 
 ERROR_TEXT_LIMIT = 300
 RESPONSE_TEXT_LIMIT = 2000
@@ -335,6 +336,9 @@ class N8nProvider(IntegrationProvider):
     icon = "🔗"
 
     content = CONTENT
+    # What Marvin learns about n8n (SDK 0.9.0): the how-to its agents read, and the Library's hand-off recipe.
+    guide = "guide.md"
+    recipes = RECIPES
     error_policy: ClassVar[ErrorPolicy] = ERROR_POLICY
 
     credentials = (

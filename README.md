@@ -120,6 +120,16 @@ workflow and pick the n8n workflow from the list.
 The metadata keys are flat because smart rules read only top-level `metadata.<key>`. Both collections are private
 (**Visible to sites** off), so a result never rebuilds a site.
 
+## What it teaches Marvin (0.2.0, SDK 0.9.0)
+
+- **A guide** (`src/marvin_integration_n8n/guide.md`): connecting, both directions of the round trip, auth modes and
+  every error code. Marvin's agents read it when building workflows where n8n is connected; Marvin's manual search
+  finds it.
+- **A recipe**, *Hand published entries to n8n* (`recipes.py`): each published entry of one type triggers an n8n
+  workflow (JWT-signed with `{{N8N_WEBHOOK_SECRET}}`) and is marked `n8n_status: sent`, so it sits in
+  **n8n: in flight** until the report-back workflow records the result. Shown in the Workflow Library as "From the
+  n8n plugin 0.2.0", offered once n8n is connected.
+
 ## Marvin → n8n: triggering a workflow
 
 1. In n8n, create a **JWT Auth** credential: Key Type **Passphrase**, Algorithm **HS256**, and a long random secret.
