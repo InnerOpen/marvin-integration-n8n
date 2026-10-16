@@ -1,6 +1,6 @@
 [project]
 name = "marvin-integration-n8n"
-version = "0.2.0"
+version = "0.3.0"
 description = "n8n integration for Marvin — a workflow step triggers an n8n workflow with signed, expiring auth, picks it from n8n's own list, and reads executions back; n8n reports results to a Marvin incoming webhook."
 readme = "README.md"
 requires-python = ">=3.11"

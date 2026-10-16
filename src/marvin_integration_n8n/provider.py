@@ -334,6 +334,7 @@ class N8nProvider(IntegrationProvider):
     )
     category = CATEGORY_DESTINATION
     icon = "🔗"
+    logo = "logo.svg"  # the n8n mark, shown instead of the emoji
 
     content = CONTENT
     # What Marvin learns about n8n (SDK 0.9.0): the how-to its agents read, and the Library's hand-off recipe.
