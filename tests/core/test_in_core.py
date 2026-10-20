@@ -76,16 +76,16 @@ class _N8n:
         return Response(status_code=self.status, content=json.dumps(self.body).encode())
 
 
-@pytest.fixture
-def n8n(db_session, workspace, monkeypatch):
-    """A workspace with an n8n connection, the plugin's content applied and switched on, a post type with entries and the hand-off recipe's workflow."""
+@pytest.fixture(params=["n8n", "flows-prod"])
+def n8n(request, db_session, workspace, monkeypatch):
+    """A workspace with an n8n connection (slugged `n8n`, or not: the report back must not care), the plugin's content applied and switched on, a post type with entries and the hand-off recipe's workflow."""
     stub = _N8n()
     monkeypatch.setitem(INTEGRATION_REGISTRY, "n8n", N8nProvider())
     monkeypatch.setattr("marvin.services.integrations.build_http", lambda: stub)
     monkeypatch.setattr("marvin.services.secrets.resolver.resolve_secret", lambda ref, gid=None: SECRET)
     gid = workspace.gid
     connection = IntegrationModel(
-        session=db_session, group_id=gid, provider="n8n", name="n8n", slug="n8n", enabled=True, config={"base_url": BASE}, secret_ref=None
+        session=db_session, group_id=gid, provider="n8n", name="n8n", slug=request.param, enabled=True, config={"base_url": BASE}, secret_ref=None
     )
     kind = EntryTypes(session=db_session, group_id=gid, name="Post", slug="post", schema_json={"fields": []})
     kind.id = uuid.uuid4()
@@ -125,7 +125,9 @@ def _switch_on(n8n):
 
 def _hand_off_workflow(n8n):
     """The workflow a person makes from the Library recipe."""
-    document = recipes.instantiate("n8n.hand-off-published-entries", {"entry_type": "post", "n8n_integration": "n8n", "webhook_path": PATH})
+    document = recipes.instantiate(
+        "n8n.hand-off-published-entries", {"entry_type": "post", "n8n_integration": n8n.connection.slug, "webhook_path": PATH}
+    )
     row = WorkspaceAutomationModel(
         session=n8n.session, group_id=n8n.gid, name=document["name"], slug="hand-off", enabled=True, definition=document["definition"]
     )
@@ -165,7 +167,9 @@ def test_the_plugins_blueprints_are_accepted_by_core_and_apply_cleanly(n8n):
     row = n8n.session.query(WorkspaceAutomationModel).filter_by(group_id=n8n.gid, slug="n8n-record-result").one()
     assert not row.enabled  # arrives switched off
     (step,) = row.definition["actions"]
-    assert (step["kind"], step["integration"]) == ("automation_result", "n8n")  # the connection's slug, resolved by core
+    assert step["kind"] == "automation_result" and "integration" not in step  # core reads n8n's words through the webhook's connection
+    webhook = n8n.session.query(WorkspaceIncomingWebhookModel).filter_by(group_id=n8n.gid, slug="n8n").one()
+    assert webhook.source_integration_id == n8n.connection.id  # ... which is the connection the card applied it from
     issues = structural_issues(row.definition) or (
         query_issues(row.definition) + item_target_issues(row.definition) + entry_link_issues(row.definition) + unknown_key_issues(row.definition)
     )
@@ -176,7 +180,9 @@ def test_the_recipe_is_in_the_library_and_its_definition_passes_cores_checks(n8n
     item = recipes.entry("n8n.hand-off-published-entries")  # a recipe core rejects is skipped from the Library, with a warning
     assert item["source"]["provider"] == "n8n"
     assert [e["kind"] for e in item["side_effects"]] == ["external_post"]
-    document = recipes.instantiate("n8n.hand-off-published-entries", {"entry_type": "post", "n8n_integration": "n8n", "webhook_path": PATH})
+    document = recipes.instantiate(
+        "n8n.hand-off-published-entries", {"entry_type": "post", "n8n_integration": n8n.connection.slug, "webhook_path": PATH}
+    )
     assert [a["kind"] for a in document["definition"]["actions"]] == ["integration"]  # no set_metadata step
     assert structural_issues(document["definition"]) == []
 
@@ -211,7 +217,7 @@ def test_a_workspace_with_the_old_workflow_is_offered_the_update_and_gets_the_ne
     n8n.session.refresh(old)
     assert old.enabled  # whether it is switched on is kept
     assert old.name == V030_NAME  # the name is not part of what Update replaces
-    assert old.definition == blueprint.payload["definition"] | {"actions": [{**blueprint.payload["definition"]["actions"][0], "integration": "n8n"}]}
+    assert old.definition == blueprint.payload["definition"]
     assert not outdated(n8n.session, n8n.gid, blueprint)
     assert "already up to date" in update_blueprint(n8n.session, n8n.gid, blueprint).detail
 
@@ -303,3 +309,41 @@ def test_the_old_workflow_still_settles_nothing_it_writes_metadata_so_it_must_be
     _report(applied, marvin={"entry_id": str(applied.a.id)}, status="success", execution_id=EXECUTION)
     (row,) = _rows(applied)
     assert row.status == "in_flight"
+
+
+def test_with_two_n8n_connections_the_report_is_read_through_the_one_that_installed_the_webhook(n8n):
+    """The workflow names no connection, so several of them (under any slugs) change nothing: an Update needs no input and the words map."""
+    other = IntegrationModel(
+        session=n8n.session,
+        group_id=n8n.gid,
+        provider="n8n",
+        name="n8n staging",
+        slug="staging-n8n",
+        enabled=True,
+        config={"base_url": BASE},
+        secret_ref=None,
+    )
+    n8n.session.add(other)
+    n8n.session.commit()
+    apply_many(n8n.session, n8n.gid, _blueprints(), integration_id=n8n.connection.id)  # applied from the first connection's card
+    n8n.session.commit()
+    workflow = _switch_on(n8n)
+    _hand_off_workflow(n8n)
+    blueprint = get_blueprint("n8n-record-result", source="n8n")
+    assert not outdated(n8n.session, n8n.gid, blueprint)  # no parameter to resolve, so nothing hides an update
+
+    workflow.definition = V030_DEFINITION  # a 0.3 workspace with two connections
+    n8n.session.commit()
+    assert outdated(n8n.session, n8n.gid, blueprint)  # the card offers Update
+    assert update_blueprint(n8n.session, n8n.gid, blueprint).updated
+    n8n.session.commit()
+
+    _publish(n8n, n8n.a)
+    _report(n8n, marvin={"entry_id": str(n8n.a.id)}, status="error", execution_id=EXECUTION, message="boom")
+    (row,) = _rows(n8n)
+    assert (row.status, row.message, row.integration_id) == ("failed", "boom", n8n.connection.id)
+
+    # A report no hand-off matches has only the webhook's connection to read its words through (n8n's `error` is Marvin's failed).
+    _report(n8n, status="error", execution_id="777", workflow="Nightly export", message="disk full")
+    unmatched = [r for r in _rows(n8n) if r.remote_id == "777"]
+    assert [(r.status, r.integration_id) for r in unmatched] == [("failed", n8n.connection.id)]

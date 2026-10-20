@@ -39,7 +39,7 @@ execution data, where a 60-second token is useless to whoever reads them.
 ## n8n → Marvin: report back
 
 1. On the n8n integration card, apply the `n8n` incoming webhook and the `n8n-record-result` workflow (an older
-   `n8n-record-result` shows **Update** there: use it). Save a random value as the secret `N8N_CALLBACK_TOKEN`,
+   `n8n-record-result` shows **Update** there: use it). Apply them from the card of the n8n connection that sends: Marvin reads n8n's words (`success`, `error`, `waiting`) through the connection that installed the webhook. Save a random value as the secret `N8N_CALLBACK_TOKEN`,
    **Create token** on the webhook, and switch the webhook and the workflow on.
 2. In n8n, a **Header Auth** credential: Name `X-Marvin-Token`, Value the same random value.
 3. End the n8n workflow with an **HTTP Request** node: `POST https://<marvin>/api/hooks/<token>` with that credential

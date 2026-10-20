@@ -147,11 +147,10 @@ card instead (see [Upgrading to 0.4.0](#upgrading-to-040)).
 | Kind | Slug | What it does |
 |---|---|---|
 | incoming webhook | `n8n` | Where n8n reports results. Scheme `static_token`, header `X-Marvin-Token`, secret `N8N_CALLBACK_TOKEN`. |
-| workflow | `n8n-record-result` | Trigger: the `n8n` incoming webhook. Condition: `event.payload.status` exists. Step: the core's `automation_result` step with `integration` (the parameter `n8n_integration`, default `n8n`), `remote_id: ${event.payload.execution_id}`, `entry_id: ${event.payload.marvin.entry_id}`, `target: ${event.payload.workflow}`, `status: ${event.payload.status}`, `message` and `finished_at`. It settles the result found by the execution id, else the entry's newest one in flight; a report that matches nothing is kept as a new result. |
+| workflow | `n8n-record-result` | Trigger: the `n8n` incoming webhook. Condition: `event.payload.status` exists. Step: the core's `automation_result` step with `remote_id: ${event.payload.execution_id}`, `entry_id: ${event.payload.marvin.entry_id}`, `target: ${event.payload.workflow}`, `status: ${event.payload.status}`, `message` and `finished_at`. It settles the result found by the execution id, else the entry's newest one in flight; a report that matches nothing is kept as a new result. |
 
-The workflow's one parameter, `n8n_integration`, names the n8n connection: the core reads n8n's status words through it. **Add**
-on a connection's card pre-selects that connection. Applying or updating without choosing (the card's **Update**, the API) uses the
-workspace's only n8n connection, else the one slugged `n8n`.
+The workflow has no parameters and names no connection: the core reads n8n's status words through the connection that installed
+the `n8n` incoming webhook the report arrived on. Any slug works, and **Update** needs no input. Apply the webhook from the card of the connection that sends (with a single n8n connection, any apply does).
 
 0.4.0 no longer ships the **n8n: failed** and **n8n: in flight** collections or writes `n8n_*` metadata on entries.
 
@@ -236,7 +235,8 @@ The personal token replaces the older "log in every run and reuse the 48-hour se
 
 Results moved into Marvin. What 0.3 kept on entries and in collections is now a record of its own.
 
-- **Needs** Marvin with automation results, which ships integration SDK 0.13. Against an older SDK the plugin does not load
+- **Needs** Marvin with automation results, which ships integration SDK 0.13 and reads a report's status words through the connection that
+  installed the webhook it arrived on (without that, `success` / `error` / `waiting` aren't understood and a result stays in flight). Against an older SDK the plugin does not load
   (it imports `HandsOff`).
 - **The collections are gone.** Marvin's migration removes **n8n: failed** and **n8n: in flight** where each is still exactly what this
   plugin shipped. One you renamed or edited stays, and is yours. Use **Settings › Automation › Results** instead (filters for in
@@ -247,9 +247,8 @@ Results moved into Marvin. What 0.3 kept on entries and in collections is now a 
 - **Update `n8n-record-result`.** A workspace that applied 0.3 has the old workflow, which still writes `n8n_*` metadata and no
   longer settles anything. Applying again leaves it as it is (apply never touches what exists). On **Settings › Integrations ›
   n8n**, the workflow shows **Update available** (↑): **Update** swaps in the new steps, keeps it switched on and keeps its name
-  (the name still reads "record the result on the entry"). An admin does this once. With several n8n connections and none slugged `n8n`,
-  the card can't tell which one the workflow should read through, and offers no Update: update it through the API with the
-  connection named (`POST /api/groups/blueprints/n8n-record-result/update?source=n8n` with `{"n8n_integration": "<slug>"}`). Until then hand-offs are recorded in flight and stay there.
+  (the name still reads "record the result on the entry"). An admin does this once, whatever the connections are called. Until then hand-offs are
+  recorded in flight and stay there.
 - **Workflows made from the old recipe** keep their `set_metadata` step (the Library marks them as made from an earlier
   version). It does no harm, but it writes `n8n_status: sent` for nothing: delete that step, or make the workflow again from the
   recipe.
@@ -267,8 +266,8 @@ Results moved into Marvin. What 0.3 kept on entries and in collections is now a 
 
 ## Logo
 
-None: the card shows the 🔗 emoji. n8n's brand guidelines ask for the logo at 100 px wide or more and cover the full logo,
-not the mark alone, while Marvin shows integration marks at about 32 px (Jared 2026-10-04: use the emoji).
+`src/marvin_integration_n8n/logo.svg` is the n8n mark (SVG, shipped in the package), which Marvin shows for the connection instead of an
+emoji.
 
 ## Known limits
 
@@ -292,7 +291,7 @@ uv run --extra dev pytest -q
 uv run --extra dev ruff check .
 ```
 
-Resolves the SDK from a sibling checkout (`../MarvinIntegrationSDK`), as CI does with the SDK's `develop` branch. The
+Resolves the SDK from a sibling checkout (`../MarvinIntegrationSDK`), as CI does with the SDK's `v0.13.0` tag. The
 package requires SDK 0.13 (`HandsOff`, `provider.result_status`). The conformance kit (`marvin_integration_sdk.testing`)
 runs in `tests/test_teaches.py` and checks the `hands_off` declaration.
 

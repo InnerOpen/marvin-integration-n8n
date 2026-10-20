@@ -12,6 +12,8 @@ from marvin_integration_n8n.content import (
 
 # The fields of Marvin's `automation_result` step (schemas/group/automation_definition.py: AutomationResultAction, core 0.13 SDK era).
 RESULT_STEP_FIELDS = {"kind", "id", "status", "integration", "remote_id", "entry_id", "target", "message", "finished_at"}
+# The step names no `integration`: the core uses the connection that installed the triggering webhook.
+PASSED_FROM_THE_REPORT = RESULT_STEP_FIELDS - {"integration"}
 # What the "report back to Marvin" HTTP Request node sends (README and guide.md).
 REPORT = {
     "marvin": {"entry_id": "0b6c1f0e-1111-4222-8333-444455556666"},
@@ -82,7 +84,6 @@ def test_record_result_settles_the_hand_off_with_an_automation_result_step():
     assert step == {
         "kind": "automation_result",
         "id": "settle",
-        "integration": "{{n8n_integration}}",
         "remote_id": "${event.payload.execution_id}",
         "entry_id": "${event.payload.marvin.entry_id}",
         "target": "${event.payload.workflow}",
@@ -95,8 +96,9 @@ def test_record_result_settles_the_hand_off_with_an_automation_result_step():
 def test_the_step_uses_only_the_arguments_core_defines_and_passes_them_all():
     (step,) = RECORD_RESULT.payload["definition"]["actions"]
     assert set(step) <= RESULT_STEP_FIELDS
-    # integration, remote_id, entry_id, target, status, message and finished_at: everything the report can say.
-    assert RESULT_STEP_FIELDS - set(step) == set()
+    # remote_id, entry_id, target, status, message and finished_at: everything the report can say. `integration` is left to core.
+    assert PASSED_FROM_THE_REPORT - set(step) == set()
+    assert "integration" not in step
 
 
 def test_every_template_reads_a_field_the_report_back_sends():
@@ -115,15 +117,11 @@ def test_the_status_is_passed_in_n8ns_words_for_the_connection_to_read():
     # provider turns them into Marvin's three (see the hands_off declaration), so the blueprint holds no n8n vocabulary.
     (step,) = RECORD_RESULT.payload["definition"]["actions"]
     assert step["status"] == "${event.payload.status}"
-    assert step["integration"] == "{{n8n_integration}}"
 
 
-def test_the_workflow_names_the_n8n_connection_as_a_parameter_defaulting_to_n8n():
-    (parameter,) = RECORD_RESULT.parameters
-    assert (parameter["key"], parameter["kind"], parameter["default"]) == ("n8n_integration", "integration", "n8n")
-    # A workspace applying with its (single) connection gets that slug in the step; the core resolves the default the same way.
-    definition = _substitute(RECORD_RESULT.payload["definition"], {"n8n_integration": "my-n8n"})
-    assert definition["actions"][0]["integration"] == "my-n8n"
+def test_the_record_result_workflow_takes_no_parameters_so_an_update_needs_no_input():
+    # It names no connection (core infers it from the webhook), so applying and updating work for any number of connections and slugs.
+    assert RECORD_RESULT.parameters == () and "{{" not in repr(RECORD_RESULT.payload) and "{{" not in RECORD_RESULT.name
 
 
 def test_the_callback_webhook_documents_the_payload_the_workflow_reads():
@@ -147,6 +145,4 @@ def test_the_webhook_secret_reference_survives_substitution():
     assert _substitute(step, {**params, "integration": "n8n"}) == step
     assert "N8N_WEBHOOK_SECRET" not in params
     for blueprint in CONTENT:
-        # Only the declared parameter is replaced (the n8n connection's slug); every other reference stays as written.
-        expected = repr(blueprint.payload).replace("{{n8n_integration}}", "n8n")
-        assert repr(_substitute(blueprint.payload, params)) == expected
+        assert _substitute(blueprint.payload, params) == blueprint.payload  # no parameter: everything stays as written

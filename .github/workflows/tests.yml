@@ -12,11 +12,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: MarvinIntegrationN8n
-      - name: Check out the SDK next to this repo (resolved via [tool.uv.sources])
+      - name: Check out the SDK next to this repo (resolved via [tool.uv.sources]; the release this plugin requires)
         uses: actions/checkout@v4
         with:
           repository: InnerOpen/marvin-integration-sdk
-          ref: develop
+          ref: v0.13.0
           path: MarvinIntegrationSDK
       - uses: astral-sh/setup-uv@v6
         with:

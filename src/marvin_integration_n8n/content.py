@@ -17,9 +17,9 @@ Applying (from the integration's card) creates only what is missing; an already-
 an older version shows **Update** on the card, which swaps in the steps below (the core's ``update_blueprint``). The
 webhook and the workflow arrive switched off; nothing here is required.
 
-Parameters: the workflow names the n8n connection (``n8n_integration``), because the core reads n8n's status words
-(``success``, ``error``, ``waiting``) through that connection's provider. It defaults to the workspace's only n8n
-connection.
+Parameters: none. The step names no ``integration``: the core reads n8n's status words (``success``, ``error``,
+``waiting``) through the connection that installed the triggering ``n8n`` webhook, so any number of n8n connections, under any
+slug, work and an Update needs no input.
 """
 
 from marvin_integration_sdk import ContentBlueprint
@@ -30,7 +30,6 @@ CALLBACK_SECRET_REF = "N8N_CALLBACK_TOKEN"
 CALLBACK_HEADER = "X-Marvin-Token"
 # The step argument a trigger_workflow step signs with — a workspace secret reference, never a value.
 WEBHOOK_SECRET_REF = "{{N8N_WEBHOOK_SECRET}}"
-INTEGRATION_PARAM = "n8n_integration"  # the blueprint parameter that names the workspace's n8n connection
 
 
 CALLBACK_WEBHOOK = ContentBlueprint(
@@ -61,15 +60,6 @@ RECORD_RESULT = ContentBlueprint(
         "execution id, else the entry's newest one in flight (marvin.entry_id). n8n's status, message and finish time are kept on it."
     ),
     category=CATEGORY,
-    parameters=(
-        {
-            "key": INTEGRATION_PARAM,
-            "label": "Which n8n connection",
-            "kind": "integration",
-            "default": WEBHOOK_SLUG,
-            "help": "The connection the hand-offs go through; it reads n8n's status words (success, error, waiting).",
-        },
-    ),
     payload={
         "definition": {
             "trigger": {"type": "incoming_webhook", "webhook": WEBHOOK_SLUG},
@@ -78,7 +68,6 @@ RECORD_RESULT = ContentBlueprint(
                 {
                     "kind": "automation_result",
                     "id": "settle",
-                    "integration": "{{" + INTEGRATION_PARAM + "}}",
                     "remote_id": "${event.payload.execution_id}",
                     "entry_id": "${event.payload.marvin.entry_id}",
                     "target": "${event.payload.workflow}",
