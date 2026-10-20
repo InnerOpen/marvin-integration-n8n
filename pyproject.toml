@@ -1,11 +1,11 @@
 [project]
 name = "marvin-integration-n8n"
-version = "0.3.0"
+version = "0.4.0"
 description = "n8n integration for Marvin — a workflow step triggers an n8n workflow with signed, expiring auth, picks it from n8n's own list, and reads executions back; n8n reports results to a Marvin incoming webhook."
 readme = "README.md"
 requires-python = ">=3.11"
-# 0.5: IntegrationError and declared error policies (`error_policy`, Handle, Retry), ctx.idempotency_key.
-dependencies = ["marvin-integration-sdk>=0.9,<1"]
+# 0.13: HandsOff and provider.result_status (the hand-off result). Earlier: 0.9 recipes and guides, 0.5 error policies.
+dependencies = ["marvin-integration-sdk>=0.13,<1"]
 
 [project.optional-dependencies]
 # PyJWT only verifies the hand-rolled HS256 tokens in tests; the package itself has no runtime dependencies.

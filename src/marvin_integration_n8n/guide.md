@@ -2,7 +2,7 @@
 
 Hands work from Marvin to n8n and hears back. A Marvin workflow's **Run integration** step with **Trigger n8n
 workflow** (`trigger_workflow`) calls an n8n workflow's **Webhook** node; n8n reports the result to a Marvin incoming
-webhook, which records it on the entry.
+webhook, which settles the hand-off's **result** under Settings › Automation › Results.
 
 ## Connect it
 
@@ -28,14 +28,18 @@ n8n receives `{marvin: {entry_id, meta, idempotency_key, sent_at}, data}` — re
 `{{ $('Webhook').item.json.body.data }}`. The header `X-Marvin-Idempotency-Key` is the same on every retry of one run;
 a **Remove Duplicates** node on it drops repeats. The step's output has `execution_id` and `execution_url`.
 
+Add nothing for tracking: `trigger_workflow` is a hand-off, so Marvin records it itself, **in flight** when n8n accepted it
+(with the execution and a link to it) and **failed** when the call failed. Don't write status metadata on the entry; there is
+no `n8n_*` metadata any more.
+
 Other auth modes (`default_auth`, or `auth` on a step): `header` (secret in `X-Marvin-Hook`), `hmac`
 (`X-Marvin-Signature`, checked in the workflow), `none`. JWT is the default because n8n stores request headers in its
 execution data, where a 60-second token is useless to whoever reads them.
 
 ## n8n → Marvin: report back
 
-1. On the n8n integration card, apply the `n8n` incoming webhook and the `n8n-record-result` workflow (and the
-   **n8n: failed** / **n8n: in flight** collections if wanted). Save a random value as the secret `N8N_CALLBACK_TOKEN`,
+1. On the n8n integration card, apply the `n8n` incoming webhook and the `n8n-record-result` workflow (an older
+   `n8n-record-result` shows **Update** there: use it). Save a random value as the secret `N8N_CALLBACK_TOKEN`,
    **Create token** on the webhook, and switch the webhook and the workflow on.
 2. In n8n, a **Header Auth** credential: Name `X-Marvin-Token`, Value the same random value.
 3. End the n8n workflow with an **HTTP Request** node: `POST https://<marvin>/api/hooks/<token>` with that credential
@@ -43,12 +47,15 @@ execution data, where a 60-second token is useless to whoever reads them.
    "execution_id": "{{ $execution.id }}", "workflow": "{{ $workflow.name }}", "finished_at": "{{ $now.toISO() }}",
    "message": ""}`. Send `"status": "error"` with the error message from an error branch, `"waiting"` before a Wait node.
 
-The entry gets `n8n_status`, `n8n_execution_id`, `n8n_workflow`, `n8n_finished_at` and `n8n_message` metadata.
+`n8n-record-result` settles the result of that hand-off, found by `execution_id` (else the entry's newest one in flight), with
+`status` (`success` succeeded, `error` failed, `waiting` still in flight), `message` and `finished_at`. See it under
+Settings › Automation › Results; a failure also shows on the dashboard and on the entry, and one that never gets a report shows
+as **No reply** after 24 hours. There are no n8n collections to look in.
 
 ## Recipe
 
 **Hand published entries to n8n** (Workflow Library): each published entry of one type triggers an n8n workflow with
-its title, link, type and summary, and is marked `n8n_status: sent` — so it shows in **n8n: in flight** until n8n
+its title, link, type and summary. That is all the recipe does: Marvin records the hand-off as a result, in flight until n8n
 reports back.
 
 ## When it fails

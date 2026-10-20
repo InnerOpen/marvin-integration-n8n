@@ -1,19 +1,21 @@
 """Workflow Library recipes n8n ships (SDK 0.9.0): offered in Marvin once an n8n connection exists.
 
-``hand-off-published-entries`` is the send half of the round trip ``content.py`` declares the return half of: it
-marks the entry ``n8n_status: sent`` so it shows in **n8n: in flight** until n8n reports back.
+``hand-off-published-entries`` is the send half of the round trip ``content.py`` declares the return half of. It is one
+``trigger_workflow`` step and nothing else: that action declares ``hands_off``, so the core records the hand-off itself (in
+flight, or failed when the call fails) under Settings > Automation > Results, until n8n reports back and
+``n8n-record-result`` settles it.
 """
 
 from marvin_integration_sdk import WorkflowRecipe
 
-from .content import EXECUTION_KEY, STATUS_KEY, WEBHOOK_SECRET_REF, WORKFLOW_KEY
+from .content import WEBHOOK_SECRET_REF
 
 HAND_OFF = WorkflowRecipe(
     id="hand-off-published-entries",
     title="Hand published entries to n8n",
     outcome=(
-        "Each published entry of one type triggers an n8n workflow with its title, link, type and summary, and is marked as sent "
-        "until n8n reports back."
+        "Each published entry of one type triggers an n8n workflow with its title, link, type and summary. Marvin keeps a result for it, "
+        "in flight until n8n reports back, under Settings > Automation > Results."
     ),
     category="Automation hand-off",
     tags=("handoff", "publishing"),
@@ -33,11 +35,6 @@ HAND_OFF = WorkflowRecipe(
                     "data": {"title": "${entry.title}", "url": "${entry.url}", "entry_type": "${entry.entry_type}", "summary": "${entry.summary}"},
                 },
             },
-            {
-                "kind": "entry",
-                "op": "set_metadata",
-                "metadata": {STATUS_KEY: "sent", WORKFLOW_KEY: "{{webhook_path}}", EXECUTION_KEY: "${steps.handoff.output.execution_id}"},
-            },
         ],
     },
     variables={
@@ -50,8 +47,10 @@ HAND_OFF = WorkflowRecipe(
         },
     },
     side_effects=(
-        {"kind": "external_post", "description": "Triggers an n8n workflow."},
-        {"kind": "content_mutation", "description": "Writes n8n_status, n8n_workflow and n8n_execution_id metadata on the entry."},
+        {
+            "kind": "external_post",
+            "description": "Triggers an n8n workflow. Marvin keeps a result of the hand-off (Settings > Automation > Results); the entry itself is not changed.",
+        },
     ),
 )
 

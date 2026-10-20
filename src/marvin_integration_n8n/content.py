@@ -1,19 +1,25 @@
 """What a workspace can use to hear back from n8n — declared for the core to offer, all optional.
 
 There are no send-side blueprints: sending is a ``trigger_workflow`` step a person adds to their own
-workflow, picking the n8n workflow from n8n's list. What's declared is the return path:
+workflow, picking the n8n workflow from n8n's list. That action declares ``hands_off`` (see ``provider.py``), so
+the core keeps one result per trigger, in flight, with nothing to add to the workflow. What's declared here is the
+return path:
 
   an n8n workflow finishes → its "report back to Marvin" HTTP Request node POSTs
   ``{marvin: {entry_id}, status, execution_id, workflow, finished_at, message}`` to the ``n8n`` incoming
-  webhook (header ``X-Marvin-Token``) → ``n8n-record-result`` writes flat ``n8n_*`` metadata on that
-  entry → the smart collections ``n8n-failed`` and ``n8n-in-flight`` follow that metadata.
+  webhook (header ``X-Marvin-Token``) → ``n8n-record-result`` runs the core's ``automation_result`` step, which
+  settles that result (found by the execution id, else the entry's newest one in flight).
 
-Applying (from the integration's card) creates only what is missing. The webhook and the workflow
-arrive switched off; nothing here is required. The metadata keys are flat because smart rules read
-only top-level ``metadata.<key>``. Both collections are private (not "Visible to sites"), so a result
-never rebuilds a site.
+Results are listed under Settings › Automation › Results. Since 0.4.0 there are no ``n8n_*`` entry metadata and no
+``n8n-failed`` / ``n8n-in-flight`` collections: the core removed the untouched ones and imported the metadata.
 
-Parameters: none — the webhook and the workflow name only their own content.
+Applying (from the integration's card) creates only what is missing; an already-applied ``n8n-record-result`` from
+an older version shows **Update** on the card, which swaps in the steps below (the core's ``update_blueprint``). The
+webhook and the workflow arrive switched off; nothing here is required.
+
+Parameters: the workflow names the n8n connection (``n8n_integration``), because the core reads n8n's status words
+(``success``, ``error``, ``waiting``) through that connection's provider. It defaults to the workspace's only n8n
+connection.
 """
 
 from marvin_integration_sdk import ContentBlueprint
@@ -24,12 +30,8 @@ CALLBACK_SECRET_REF = "N8N_CALLBACK_TOKEN"
 CALLBACK_HEADER = "X-Marvin-Token"
 # The step argument a trigger_workflow step signs with — a workspace secret reference, never a value.
 WEBHOOK_SECRET_REF = "{{N8N_WEBHOOK_SECRET}}"
+INTEGRATION_PARAM = "n8n_integration"  # the blueprint parameter that names the workspace's n8n connection
 
-STATUS_KEY = "n8n_status"  # success | error | waiting, as n8n reports it
-EXECUTION_KEY = "n8n_execution_id"
-WORKFLOW_KEY = "n8n_workflow"
-FINISHED_KEY = "n8n_finished_at"
-MESSAGE_KEY = "n8n_message"
 
 CALLBACK_WEBHOOK = ContentBlueprint(
     kind="incoming_webhook",
@@ -55,65 +57,38 @@ RECORD_RESULT = ContentBlueprint(
     slug="n8n-record-result",
     name="n8n: record the result on the entry",
     description=(
-        "When n8n reports back on the n8n webhook, write its status, execution id, workflow, finish time and message on the entry it names "
-        "(marvin.entry_id), as flat n8n_* metadata the smart collections read."
+        "When n8n reports back on the n8n webhook, settle the hand-off's result (Settings > Automation > Results): found by the "
+        "execution id, else the entry's newest one in flight (marvin.entry_id). n8n's status, message and finish time are kept on it."
     ),
     category=CATEGORY,
+    parameters=(
+        {
+            "key": INTEGRATION_PARAM,
+            "label": "Which n8n connection",
+            "kind": "integration",
+            "default": WEBHOOK_SLUG,
+            "help": "The connection the hand-offs go through; it reads n8n's status words (success, error, waiting).",
+        },
+    ),
     payload={
         "definition": {
             "trigger": {"type": "incoming_webhook", "webhook": WEBHOOK_SLUG},
-            "conditions": [{"field": "event.payload.marvin.entry_id", "op": "exists"}],
+            "conditions": [{"field": "event.payload.status", "op": "exists"}],
             "actions": [
                 {
-                    "kind": "entry",
-                    "op": "set_metadata",
-                    "entity_id": "$event.payload.marvin.entry_id",
-                    "metadata": {
-                        STATUS_KEY: "${event.payload.status}",
-                        EXECUTION_KEY: "${event.payload.execution_id}",
-                        WORKFLOW_KEY: "${event.payload.workflow}",
-                        FINISHED_KEY: "${event.payload.finished_at}",
-                        MESSAGE_KEY: "${event.payload.message}",
-                    },
+                    "kind": "automation_result",
+                    "id": "settle",
+                    "integration": "{{" + INTEGRATION_PARAM + "}}",
+                    "remote_id": "${event.payload.execution_id}",
+                    "entry_id": "${event.payload.marvin.entry_id}",
+                    "target": "${event.payload.workflow}",
+                    "status": "${event.payload.status}",
+                    "message": "${event.payload.message}",
+                    "finished_at": "${event.payload.finished_at}",
                 },
             ],
         }
     },
 )
 
-
-def _by_status(slug: str, name: str, description: str, condition: dict, icon: str) -> ContentBlueprint:
-    """A private smart collection of the entries whose top-level ``n8n_status`` metadata matches."""
-    return ContentBlueprint(
-        kind="collection",
-        slug=slug,
-        name=name,
-        description=description,
-        category=CATEGORY,
-        payload={
-            "description": description,
-            "icon": icon,
-            "is_smart": True,
-            "is_public": False,
-            "smart_rules": {"where": [{"field": f"metadata.{STATUS_KEY}", **condition}], "match": "all"},
-        },
-    )
-
-
-FAILED = _by_status(
-    "n8n-failed",
-    "n8n: failed",
-    "Entries whose n8n workflow reported an error. Fills itself from n8n's reports; private, so sites never see it.",
-    {"op": "eq", "value": "error"},
-    "🚨",
-)
-
-IN_FLIGHT = _by_status(
-    "n8n-in-flight",
-    "n8n: in flight",
-    "Entries handed to n8n that haven't finished (sent or waiting). Fills itself from n8n's reports; private, so sites never see it.",
-    {"op": "in", "value": ["sent", "waiting"]},
-    "⏳",
-)
-
-CONTENT = (CALLBACK_WEBHOOK, RECORD_RESULT, FAILED, IN_FLIGHT)
+CONTENT = (CALLBACK_WEBHOOK, RECORD_RESULT)

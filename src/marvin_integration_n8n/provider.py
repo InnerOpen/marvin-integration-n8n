@@ -3,7 +3,9 @@
 The provider is pure with respect to Marvin: it gets ``config`` (where n8n lives, how to sign), the
 resolved ``secret`` (the n8n API key — optional), a ``logger`` and a safe ``http`` client via ``ctx``,
 and returns dicts. Receiving n8n's reports back (an incoming webhook) is the core's job; this provider
-only declares that webhook and the workflow that records the result (see ``content.py``).
+only declares that webhook and the workflow that records the result (see ``content.py``). ``trigger_workflow``
+declares ``hands_off``, so the core keeps one result per trigger (Settings > Automation > Results) and the report-back
+workflow settles it with n8n's own status words.
 
 n8n facts this leans on:
 - The public API (``/api/v1``, ``X-N8N-API-KEY``) lists workflows and executions but cannot *run* a
@@ -34,6 +36,7 @@ from marvin_integration_sdk import (
     CredentialField,
     ErrorPolicy,
     Handle,
+    HandsOff,
     IntegrationContext,
     IntegrationError,
     IntegrationProvider,
@@ -466,6 +469,14 @@ class N8nProvider(IntegrationProvider):
                     "execution_url": _STR,
                 },
             },
+            # Marvin keeps one result per trigger (Settings > Automation > Results): in flight once n8n has accepted it, failed
+            # when the call itself fails, settled by n8n's report back. n8n's words for how a run went map to Marvin's three.
+            hands_off=HandsOff(
+                remote_id="execution_id",
+                remote_url="execution_url",
+                target="path",
+                statuses={"success": "succeeded", "error": "failed", "waiting": "in_flight"},
+            ),
         ),
         ProviderAction(
             key="list_workflows",

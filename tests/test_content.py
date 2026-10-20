@@ -1,4 +1,4 @@
-"""Declared content: the callback webhook, the record-result workflow and two smart collections."""
+"""Declared content: the callback webhook and the record-result workflow (an automation_result step)."""
 
 import re
 
@@ -6,14 +6,21 @@ from marvin_integration_n8n import N8nProvider
 from marvin_integration_n8n.content import (
     CALLBACK_WEBHOOK,
     CONTENT,
-    FAILED,
-    IN_FLIGHT,
     RECORD_RESULT,
     WEBHOOK_SECRET_REF,
 )
 
-# The ops a smart rule's `where` accepts (Marvin's services/entries/query.py WHERE_OPS).
-WHERE_OPS = ("eq", "neq", "in", "contains", "exists", "missing", "gt", "gte", "lt", "lte")
+# The fields of Marvin's `automation_result` step (schemas/group/automation_definition.py: AutomationResultAction, core 0.13 SDK era).
+RESULT_STEP_FIELDS = {"kind", "id", "status", "integration", "remote_id", "entry_id", "target", "message", "finished_at"}
+# What the "report back to Marvin" HTTP Request node sends (README and guide.md).
+REPORT = {
+    "marvin": {"entry_id": "0b6c1f0e-1111-4222-8333-444455556666"},
+    "status": "success",
+    "execution_id": "1001",
+    "workflow": "Publish to the newsletter",
+    "finished_at": "2026-10-20T10:00:00.000+00:00",
+    "message": "",
+}
 _PLACEHOLDER = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 
 
@@ -32,13 +39,15 @@ def _substitute(value, params):
 
 
 def test_declares_the_return_path_only():
-    assert [(b.kind, b.slug) for b in CONTENT] == [
-        ("incoming_webhook", "n8n"),
-        ("workflow", "n8n-record-result"),
-        ("collection", "n8n-failed"),
-        ("collection", "n8n-in-flight"),
-    ]
+    assert [(b.kind, b.slug) for b in CONTENT] == [("incoming_webhook", "n8n"), ("workflow", "n8n-record-result")]
     assert N8nProvider.content == CONTENT
+
+
+def test_ships_no_collections_and_nothing_that_writes_entry_metadata():
+    # 0.4.0: results live under Settings > Automation > Results; the core removed the untouched n8n collections.
+    assert [b.slug for b in CONTENT if b.kind == "collection"] == []
+    assert "set_metadata" not in repr([b.payload for b in CONTENT])
+    assert "n8n_status" not in repr([b.payload for b in CONTENT])
 
 
 def test_nothing_is_required_and_nothing_arrives_switched_on():
@@ -64,39 +73,63 @@ def test_the_callback_webhook_takes_a_static_token():
     assert "token" not in CALLBACK_WEBHOOK.payload  # minted in the workspace, never declared
 
 
-def test_record_result_writes_flat_metadata_on_the_named_entry():
+def test_record_result_settles_the_hand_off_with_an_automation_result_step():
     d = RECORD_RESULT.payload["definition"]
     assert d["trigger"] == {"type": "incoming_webhook", "webhook": CALLBACK_WEBHOOK.slug}
-    assert d["conditions"] == [{"field": "event.payload.marvin.entry_id", "op": "exists"}]
+    assert d["conditions"] == [{"field": "event.payload.status", "op": "exists"}]  # a report with no status has nothing to record
     (step,) = d["actions"]
-    assert (step["kind"], step["op"], step["entity_id"]) == ("entry", "set_metadata", "$event.payload.marvin.entry_id")
-    assert step["metadata"] == {
-        "n8n_status": "${event.payload.status}",
-        "n8n_execution_id": "${event.payload.execution_id}",
-        "n8n_workflow": "${event.payload.workflow}",
-        "n8n_finished_at": "${event.payload.finished_at}",
-        "n8n_message": "${event.payload.message}",
+    assert step["kind"] == "automation_result"
+    assert step == {
+        "kind": "automation_result",
+        "id": "settle",
+        "integration": "{{n8n_integration}}",
+        "remote_id": "${event.payload.execution_id}",
+        "entry_id": "${event.payload.marvin.entry_id}",
+        "target": "${event.payload.workflow}",
+        "status": "${event.payload.status}",
+        "message": "${event.payload.message}",
+        "finished_at": "${event.payload.finished_at}",
     }
-    assert all("." not in key for key in step["metadata"])  # smart rules read only top-level metadata
 
 
-def test_collections_are_private_smart_collections_over_top_level_metadata():
-    written = set(RECORD_RESULT.payload["definition"]["actions"][0]["metadata"])
-    for blueprint in (FAILED, IN_FLIGHT):
-        payload = blueprint.payload
-        assert (payload["is_smart"], payload["is_public"]) == (True, False)
-        for condition in payload["smart_rules"]["where"]:
-            prefix, _, key = condition["field"].partition(".")
-            assert prefix == "metadata" and key in written and "." not in key
-            assert condition["op"] in WHERE_OPS
+def test_the_step_uses_only_the_arguments_core_defines_and_passes_them_all():
+    (step,) = RECORD_RESULT.payload["definition"]["actions"]
+    assert set(step) <= RESULT_STEP_FIELDS
+    # integration, remote_id, entry_id, target, status, message and finished_at: everything the report can say.
+    assert RESULT_STEP_FIELDS - set(step) == set()
 
 
-def test_the_collection_rules_match_the_plan():
-    assert FAILED.payload["smart_rules"] == {"where": [{"field": "metadata.n8n_status", "op": "eq", "value": "error"}], "match": "all"}
-    assert IN_FLIGHT.payload["smart_rules"] == {
-        "where": [{"field": "metadata.n8n_status", "op": "in", "value": ["sent", "waiting"]}],
-        "match": "all",
-    }
+def test_every_template_reads_a_field_the_report_back_sends():
+    (step,) = RECORD_RESULT.payload["definition"]["actions"]
+    paths = [v[2:-1] for v in step.values() if v.startswith("${")]
+    assert len(paths) == 6
+    for path in paths:
+        node = {"event": {"payload": REPORT}}
+        for hop in path.split("."):
+            assert hop in node, path
+            node = node[hop]
+
+
+def test_the_status_is_passed_in_n8ns_words_for_the_connection_to_read():
+    # No mapping in the workflow: `success`, `error` and `waiting` reach the step as n8n sends them, and the n8n connection's
+    # provider turns them into Marvin's three (see the hands_off declaration), so the blueprint holds no n8n vocabulary.
+    (step,) = RECORD_RESULT.payload["definition"]["actions"]
+    assert step["status"] == "${event.payload.status}"
+    assert step["integration"] == "{{n8n_integration}}"
+
+
+def test_the_workflow_names_the_n8n_connection_as_a_parameter_defaulting_to_n8n():
+    (parameter,) = RECORD_RESULT.parameters
+    assert (parameter["key"], parameter["kind"], parameter["default"]) == ("n8n_integration", "integration", "n8n")
+    # A workspace applying with its (single) connection gets that slug in the step; the core resolves the default the same way.
+    definition = _substitute(RECORD_RESULT.payload["definition"], {"n8n_integration": "my-n8n"})
+    assert definition["actions"][0]["integration"] == "my-n8n"
+
+
+def test_the_callback_webhook_documents_the_payload_the_workflow_reads():
+    # The webhook's description names the fields the record-result workflow reads.
+    for field in ("entry_id", "status", "execution_id", "workflow", "finished_at", "message"):
+        assert field in CALLBACK_WEBHOOK.payload["description"]
 
 
 def test_every_placeholder_is_a_declared_parameter():
@@ -114,4 +147,6 @@ def test_the_webhook_secret_reference_survives_substitution():
     assert _substitute(step, {**params, "integration": "n8n"}) == step
     assert "N8N_WEBHOOK_SECRET" not in params
     for blueprint in CONTENT:
-        assert _substitute(blueprint.payload, params) == blueprint.payload
+        # Only the declared parameter is replaced (the n8n connection's slug); every other reference stays as written.
+        expected = repr(blueprint.payload).replace("{{n8n_integration}}", "n8n")
+        assert repr(_substitute(blueprint.payload, params)) == expected
