@@ -3,4 +3,4 @@
 from .provider import N8nProvider
 
 __all__ = ["N8nProvider"]
-__version__ = "0.4.0"
+__version__ = "0.4.1"

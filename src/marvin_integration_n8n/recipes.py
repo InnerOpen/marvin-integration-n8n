@@ -42,7 +42,7 @@ HAND_OFF = WorkflowRecipe(
         "n8n_integration": {"type": "integration_slug", "description": "The n8n connection to trigger through.", "example": "n8n"},
         "webhook_path": {
             "type": "text",
-            "description": "The n8n Webhook node's path (POST, JWT Auth with the N8N_WEBHOOK_SECRET passphrase; the workflow must be active).",
+            "description": "The path of the Webhook node in your n8n workflow. Set the node to POST with JWT Auth using the `N8N_WEBHOOK_SECRET` passphrase, and make sure the workflow is active.",
             "example": "marvin/new-entry",
         },
     },
